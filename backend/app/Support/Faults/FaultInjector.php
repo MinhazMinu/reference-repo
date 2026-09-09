@@ -20,9 +20,14 @@ class FaultInjector
 {
     public const MODES = ['deadlock_once', 'table_full'];
 
+    private ?string $mode = null;
+
     private int $hits = 0;
 
-    public function __construct(private ?string $mode = null) {}
+    public function __construct(?string $mode = null)
+    {
+        $this->setMode($mode);
+    }
 
     public function setMode(?string $mode): void
     {
