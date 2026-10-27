@@ -21,6 +21,12 @@ export class InsufficientStockError extends HttpError {
   }
 }
 
+export class OrderPlacementFailed extends HttpError {
+  constructor() {
+    super(503, "We could not place your order right now. Nothing was charged or reserved. Please try again.");
+  }
+}
+
 // eslint-disable-next-line no-unused-vars
 export function errorHandler(err, req, res, next) {
   if (err instanceof HttpError) {

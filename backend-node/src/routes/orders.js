@@ -2,7 +2,7 @@ import { Router } from "express";
 import { Op } from "sequelize";
 import { isPositiveInt, validator } from "../http/validate.js";
 import { Customer, Order, ORDER_STATUSES, Product } from "../models/index.js";
-import { orderResource } from "../serializers/orderResource.js";
+import { orderResource, serializeOrders } from "../serializers/orderResource.js";
 import { placeOrder } from "../services/placeOrder.js";
 import { paginated } from "./paginate.js";
 
@@ -11,22 +11,22 @@ export const ordersRouter = Router();
 ordersRouter.get("/", async (req, res) => {
   const { status, search } = req.query;
   const page = Math.max(1, Number(req.query.page) || 1);
-  const perPage = Number(req.query.per_page) || 15;
+  const perPage = req.query.per_page === undefined ? 15 : Number(req.query.per_page);
 
   const v = validator();
   v.check("status", !status || ORDER_STATUSES.includes(status), "The selected status is invalid.");
+  v.check("per_page", Number.isInteger(perPage) && perPage >= 1 && perPage <= 100, "The per page field must be between 1 and 100.");
   v.check("search", !search || String(search).length <= 100, "The search field must not be greater than 100 characters.");
   v.passOrThrow();
 
-  let where = {};
+  const where = {};
   if (status) where.status = status;
 
   if (search) {
     const customers = await Customer.findAll({ attributes: ["id"], where: { name: { [Op.like]: `%${search}%` } } });
 
-    where = {
-      [Op.or]: [{ reference: { [Op.like]: `%${search}%` } }, { customerId: customers.map((c) => c.id) }],
-    };
+    // Added alongside status (AND), not replacing the whole where clause.
+    where[Op.or] = [{ reference: { [Op.like]: `%${search}%` } }, { customerId: customers.map((c) => c.id) }];
   }
 
   const { rows, count } = await Order.findAndCountAll({
@@ -36,7 +36,7 @@ ordersRouter.get("/", async (req, res) => {
     offset: (page - 1) * perPage,
   });
 
-  const data = await Promise.all(rows.map(orderResource));
+  const data = await serializeOrders(rows);
 
   res.json(paginated(req, data, { page, perPage, total: count }));
 });
