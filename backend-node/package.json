@@ -1,0 +1,26 @@
+{
+  "name": "orderdesk-backend-node",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "db:seed": "node src/db/seed.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "mysql2": "^3.24.6",
+    "sequelize": "^6.37.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "supertest": "^7.3.1",
+    "vitest": "^5.0.5"
+  }
+}

@@ -1,3 +1,8 @@
+# Pick ONE backend with a profile:
+#   docker compose --profile laravel up --build
+#   docker compose --profile node up --build
+# Both serve the same API on port 8000; the frontend talks to whichever is running.
+
 services:
   mysql:
     image: mysql:8.0
@@ -6,6 +11,8 @@ services:
       MYSQL_USER: orderdesk
       MYSQL_PASSWORD: secret
       MYSQL_ROOT_PASSWORD: root
+    volumes:
+      - ./docker/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
       - "${MYSQL_PORT:-3307}:3306"
     healthcheck:
@@ -13,10 +20,11 @@ services:
       interval: 5s
       retries: 20
 
-  backend:
-    build: ./backend
+  backend-laravel:
+    profiles: [laravel]
+    build: ./backend-laravel
     volumes:
-      - ./backend:/app
+      - ./backend-laravel:/app
     environment:
       DB_CONNECTION: mysql
       DB_HOST: mysql
@@ -30,6 +38,35 @@ services:
       PHP_CLI_SERVER_WORKERS: 4
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    networks:
+      default:
+        aliases: [backend]
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  backend-node:
+    profiles: [node]
+    image: node:24-alpine
+    working_dir: /app
+    volumes:
+      - ./backend-node:/app
+      - backend_node_modules:/app/node_modules
+    environment:
+      PORT: 8000
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_DATABASE: orderdesk
+      DB_USERNAME: orderdesk
+      DB_PASSWORD: secret
+      DB_TEST_DATABASE: orderdesk_test
+    # Fresh, seeded database on every boot so everyone starts from the same data.
+    command: sh -c "npm ci && npm run db:seed && npm run dev"
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    networks:
+      default:
+        aliases: [backend]
     depends_on:
       mysql:
         condition: service_healthy
@@ -45,8 +82,7 @@ services:
     command: sh -c "npm ci && npm run dev -- -H 0.0.0.0"
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
-    depends_on:
-      - backend
 
 volumes:
   frontend_node_modules:
+  backend_node_modules:
