@@ -18,6 +18,8 @@ export default function NewOrderForm({ simulateFault }: { simulateFault?: string
   const [customerId, setCustomerId] = useState("");
   const [lines, setLines] = useState<Line[]>([emptyLine()]);
   const [success, setSuccess] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetchCustomers().then((res) => setCustomers(res.data));
@@ -30,24 +32,35 @@ export default function NewOrderForm({ simulateFault }: { simulateFault?: string
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
+    if (submitting) return;
+
     setSuccess(null);
+    setError(null);
+    setSubmitting(true);
 
-    const res = await createOrder(
-      {
-        customer_id: Number(customerId),
-        items: lines.map((line) => ({ product_id: Number(line.productId), quantity: line.quantity })),
-      },
-      { simulateFault },
-    );
+    try {
+      const res = await createOrder(
+        {
+          customer_id: Number(customerId),
+          items: lines.map((line) => ({ product_id: Number(line.productId), quantity: line.quantity })),
+        },
+        { simulateFault },
+      );
 
-    setSuccess(`Order ${res.data.reference} placed for ${formatMoney(res.data.total_cents)}.`);
-    setCustomerId("");
-    setLines([emptyLine()]);
+      setSuccess(`Order ${res.data.reference} placed for ${formatMoney(res.data.total_cents)}.`);
+      setCustomerId("");
+      setLines([emptyLine()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
     <form className="card" onSubmit={handleSubmit}>
       {success && <p role="status" className="notice">{success}</p>}
+      {error && <p role="alert" className="alert">{error}</p>}
 
       <label>
         Customer
@@ -99,7 +112,9 @@ export default function NewOrderForm({ simulateFault }: { simulateFault?: string
       </div>
 
       <div>
-        <button type="submit">Place order</button>
+        <button type="submit" disabled={submitting}>
+          {submitting ? "Placing order…" : "Place order"}
+        </button>
       </div>
     </form>
   );

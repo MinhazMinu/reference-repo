@@ -2,6 +2,17 @@ import type { Customer, NewOrder, Order, OrderStatus, Paginated, Product } from 
 
 const BASE_URL = "/api";
 
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly errors: Record<string, string[]> = {},
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -12,7 +23,13 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     },
   });
 
-  return res.json();
+  const body = await res.json().catch(() => null);
+
+  if (!res.ok) {
+    throw new ApiError(body?.message ?? `Request failed with status ${res.status}`, res.status, body?.errors);
+  }
+
+  return body as T;
 }
 
 export interface OrderQuery {
