@@ -17,13 +17,17 @@ class OrderController extends Controller
         $request->validate([
             'status' => ['nullable', 'in:'.implode(',', Order::STATUSES)],
             'search' => ['nullable', 'string', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $orders = Order::query()
+            ->with(['customer' => fn ($customer) => $customer->withCount('orders'), 'items.product'])
+            ->withSum('items', 'quantity')
             ->when($request->input('status'), fn ($query, $status) => $query->where('status', $status))
-            ->when($request->input('search'), fn ($query, $search) => $query
+            // Grouped so the OR can't escape the status filter: status = ? AND (reference LIKE ? OR customer LIKE ?)
+            ->when($request->input('search'), fn ($query, $search) => $query->where(fn ($query) => $query
                 ->where('reference', 'like', "%{$search}%")
-                ->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', "%{$search}%")))
+                ->orWhereHas('customer', fn ($customer) => $customer->where('name', 'like', "%{$search}%"))))
             ->latest('placed_at')
             ->paginate($request->integer('per_page', 15));
 
@@ -32,7 +36,7 @@ class OrderController extends Controller
 
     public function show(Order $order)
     {
-        return new OrderResource($order->load('customer', 'items.product'));
+        return new OrderResource($order->load(['customer' => fn ($customer) => $customer->withCount('orders'), 'items.product']));
     }
 
     public function store(StoreOrderRequest $request, PlaceOrder $placeOrder)
@@ -41,6 +45,8 @@ class OrderController extends Controller
             Customer::findOrFail($request->integer('customer_id')),
             $request->validated('items'),
         );
+
+        $order->load(['customer' => fn ($customer) => $customer->withCount('orders'), 'items.product']);
 
         return (new OrderResource($order))->response()->setStatusCode(201);
     }

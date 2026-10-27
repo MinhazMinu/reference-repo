@@ -21,7 +21,7 @@ class OrderResource extends JsonResource
                 'id' => $this->customer->id,
                 'name' => $this->customer->name,
                 'email' => $this->customer->email,
-                'lifetime_orders' => $this->customer->orders()->count(),
+                'lifetime_orders' => $this->customer->orders_count ?? $this->customer->orders()->count(),
             ],
             'items' => OrderItemResource::collection($this->items),
         ];

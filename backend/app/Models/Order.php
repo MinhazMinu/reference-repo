@@ -40,6 +40,11 @@ class Order extends Model
 
     public function getItemCountAttribute(): int
     {
-        return (int) $this->items()->sum('quantity');
+        // Prefer withSum('items', 'quantity') or an already-loaded relation over a fresh query per order.
+        if (array_key_exists('items_sum_quantity', $this->attributes)) {
+            return (int) $this->attributes['items_sum_quantity'];
+        }
+
+        return (int) ($this->relationLoaded('items') ? $this->items->sum('quantity') : $this->items()->sum('quantity'));
     }
 }
